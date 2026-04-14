@@ -46,24 +46,20 @@ var serviceFor = map[collector.ResourceType]string{
 	collector.TypeAppService:     "Microsoft.Web",
 }
 
-// FetchResource tries to get the 30-day cost for a specific Azure resource.
-func FetchResource(ctx context.Context, cred *azidentity.DefaultAzureCredential, res collector.Resource) Result {
-	scope := fmt.Sprintf("/subscriptions/%s", res.SubscriptionID)
+// costTimePeriod returns the 30-day window used for cost queries.
+func costTimePeriod() (start, end time.Time) {
+	end = time.Now()
+	start = end.AddDate(0, -1, 0)
+	return
+}
 
-	client, err := armcostmanagement.NewQueryClient(cred, nil)
-	if err != nil {
-		return Result{Err: fmt.Errorf("create cost client: %w", err)}
-	}
-
-	end := time.Now()
-	start := end.AddDate(0, -1, 0)
-
+// buildQueryDef constructs a QueryDefinition with the given dimension filter.
+func buildQueryDef(start, end time.Time, dimensionName string, dimensionValues []*string) armcostmanagement.QueryDefinition {
 	granularity := armcostmanagement.GranularityTypeDaily
 	queryType := armcostmanagement.ExportTypeActualCost
 	funcSum := armcostmanagement.FunctionTypeSum
 
-	resID := res.ID
-	result, err := client.Usage(ctx, scope, armcostmanagement.QueryDefinition{
+	return armcostmanagement.QueryDefinition{
 		Type:      &queryType,
 		Timeframe: toPtr(armcostmanagement.TimeframeTypeCustom),
 		TimePeriod: &armcostmanagement.QueryTimePeriod{
@@ -80,14 +76,29 @@ func FetchResource(ctx context.Context, cred *azidentity.DefaultAzureCredential,
 			},
 			Filter: &armcostmanagement.QueryFilter{
 				Dimensions: &armcostmanagement.QueryComparisonExpression{
-					Name:     toPtr("ResourceId"),
+					Name:     toPtr(dimensionName),
 					Operator: toPtr(armcostmanagement.QueryOperatorTypeIn),
-					Values:   []*string{&resID},
+					Values:   dimensionValues,
 				},
 			},
 		},
-	}, nil)
+	}
+}
 
+// FetchResource tries to get the 30-day cost for a specific Azure resource.
+func FetchResource(ctx context.Context, cred *azidentity.DefaultAzureCredential, res collector.Resource) Result {
+	scope := fmt.Sprintf("/subscriptions/%s", res.SubscriptionID)
+
+	client, err := armcostmanagement.NewQueryClient(cred, nil)
+	if err != nil {
+		return Result{Err: fmt.Errorf("create cost client: %w", err)}
+	}
+
+	start, end := costTimePeriod()
+	resID := res.ID
+	queryDef := buildQueryDef(start, end, "ResourceId", []*string{&resID})
+
+	result, err := client.Usage(ctx, scope, queryDef, nil)
 	if err == nil && result.Properties != nil && result.Properties.Rows != nil {
 		total := sumCostRows(result.Properties.Rows)
 		if total > 0 {
@@ -113,38 +124,10 @@ func FetchService(ctx context.Context, cred *azidentity.DefaultAzureCredential, 
 		return Result{Err: fmt.Errorf("create cost client: %w", err)}
 	}
 
-	start := time.Now().AddDate(0, -1, 0)
-	end := time.Now()
+	start, end := costTimePeriod()
+	queryDef := buildQueryDef(start, end, "ServiceName", []*string{&svc})
 
-	granularity2 := armcostmanagement.GranularityTypeDaily
-	queryType2 := armcostmanagement.ExportTypeActualCost
-	funcSum2 := armcostmanagement.FunctionTypeSum
-
-	result, err := client.Usage(ctx, scope, armcostmanagement.QueryDefinition{
-		Type:      &queryType2,
-		Timeframe: toPtr(armcostmanagement.TimeframeTypeCustom),
-		TimePeriod: &armcostmanagement.QueryTimePeriod{
-			From: &start,
-			To:   &end,
-		},
-		Dataset: &armcostmanagement.QueryDataset{
-			Granularity: &granularity2,
-			Aggregation: map[string]*armcostmanagement.QueryAggregation{
-				"totalCost": {
-					Name:     toPtr("Cost"),
-					Function: &funcSum2,
-				},
-			},
-			Filter: &armcostmanagement.QueryFilter{
-				Dimensions: &armcostmanagement.QueryComparisonExpression{
-					Name:     toPtr("ServiceName"),
-					Operator: toPtr(armcostmanagement.QueryOperatorTypeIn),
-					Values:   []*string{&svc},
-				},
-			},
-		},
-	}, nil)
-
+	result, err := client.Usage(ctx, scope, queryDef, nil)
 	if err != nil {
 		return Result{Err: fmt.Errorf("cost management: %w", err)}
 	}
