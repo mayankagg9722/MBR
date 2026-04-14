@@ -34,6 +34,27 @@ builds:
       - -X github.com/angsak/mbr/internal/version.Commit={{.Commit}}
       - -X github.com/angsak/mbr/internal/version.Date={{.Date}}
 
+  - id: msr
+    main: ./cmd/msr
+    binary: msr
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/angsak/mbr/internal/version.Version={{.Version}}
+      - -X github.com/angsak/mbr/internal/version.Commit={{.Commit}}
+      - -X github.com/angsak/mbr/internal/version.Date={{.Date}}
+
 archives:
   - id: mbr
     format: tar.gz

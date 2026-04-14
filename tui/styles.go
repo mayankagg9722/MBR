@@ -148,6 +148,35 @@ func ResourceTypeColor(rt string) lipgloss.Color {
 		return lipgloss.Color("#84CC16") // lime
 	case "lambda:function":
 		return lipgloss.Color("#A78BFA") // violet
+	// Azure resource types
+	case "compute:vm":
+		return lipgloss.Color("#3B82F6") // blue
+	case "compute:disk":
+		return lipgloss.Color("#8B5CF6") // purple
+	case "compute:vmss":
+		return lipgloss.Color("#6366F1") // indigo
+	case "network:vnet":
+		return lipgloss.Color("#10B981") // green
+	case "network:subnet":
+		return lipgloss.Color("#06B6D4") // cyan
+	case "network:nsg":
+		return lipgloss.Color("#F59E0B") // amber
+	case "network:public-ip":
+		return lipgloss.Color("#EC4899") // pink
+	case "network:lb":
+		return lipgloss.Color("#14B8A6") // teal
+	case "sql:server", "sql:database":
+		return lipgloss.Color("#F97316") // orange
+	case "cosmos:account":
+		return lipgloss.Color("#EAB308") // yellow
+	case "redis:cache":
+		return lipgloss.Color("#84CC16") // lime
+	case "storage:account":
+		return lipgloss.Color("#10B981") // green
+	case "appservice:function":
+		return lipgloss.Color("#A78BFA") // violet
+	case "appservice:webapp":
+		return lipgloss.Color("#C084FC") // light violet
 	default:
 		return Palette.Muted
 	}
